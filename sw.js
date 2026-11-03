@@ -37,8 +37,8 @@ try {
     const body  = n.body  || data.body  || '';
     self.registration.showNotification(title, {
       body: body,
-      icon: BASE + 'icon-192.png',
-      badge: BASE + 'icon-192.png',
+      icon: BASE + 'gd-icon-192.png',
+      badge: BASE + 'gd-icon-192.png',
       tag: data.tag || ('gd-' + Date.now()),
       data: { url: BASE, ...data }
     });
@@ -65,8 +65,8 @@ self.addEventListener('notificationclick', (event) => {
 const SHELL = [
   BASE,
   BASE + 'index.html',
-  BASE + 'icon.png',
-  BASE + 'icon-192.png',
+  BASE + 'gd-icon-512.png',
+  BASE + 'gd-icon-192.png',
   BASE + 'manifest.json',
 ];
 
@@ -84,7 +84,9 @@ const CDN = [
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    try { await cache.addAll(SHELL); } catch (_) {}
+    // cache: 'reload' skips the browser's HTTP cache (GitHub Pages sends max-age=600),
+    // so a new version never pre-caches the previous version's files.
+    try { await cache.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))); } catch (_) {}
     // cache.put (not addAll) — addAll rejects the opaque responses no-cors fetches return.
     await Promise.all(CDN.map(async (u) => {
       try {
@@ -140,7 +142,9 @@ self.addEventListener('fetch', (e) => {
       // shell opens instantly while the fresh copy keeps downloading in the
       // background for next launch. No cache yet = keep waiting on network.
       const network = (async () => {
-        const fresh = await fetch(req);
+        // Revalidate with the server instead of reusing the browser's 10-minute copy.
+        // (A navigate-mode Request can't take init options, so fetch by URL.)
+        const fresh = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' });
         try {
           if (fresh && fresh.ok) { const c = await caches.open(CACHE); c.put(req, fresh.clone()); }
         } catch (_) {}
